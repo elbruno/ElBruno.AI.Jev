@@ -7,7 +7,7 @@ $policy = Join-Path $PSScriptRoot 'Get-ReleaseMetadata.ps1'
 $passed = 0
 
 function Assert-ReleasePolicy {
-    param([hashtable]$Inputs, [string]$ExpectedVersion, [bool]$ExpectedPublish = $false, [string]$ExpectedError)
+    param([hashtable]$Inputs, [string]$ExpectedVersion, [bool]$ExpectedPublish = $false, [string]$ExpectedError, [string]$ExpectedVerificationRun = '')
     $failure = $null
     $result = $null
     try {
@@ -22,7 +22,7 @@ function Assert-ReleasePolicy {
         }
     }
     elseif ($failure -or $result.Version -cne $ExpectedVersion -or $result.PublishAllowed -ne $ExpectedPublish -or
-        $result.RepositoryUrl -cne 'https://github.com/elbruno/ElBruno.AI.Jev') {
+        $result.RepositoryUrl -cne 'https://github.com/elbruno/ElBruno.AI.Jev' -or $result.VerificationRun -cne $ExpectedVerificationRun) {
         throw "Unexpected release policy result: $failure"
     }
     $script:passed++
@@ -45,4 +45,10 @@ Assert-ReleasePolicy @{ EventName = 'workflow_dispatch'; Version = '0.5.0-previe
 Assert-ReleasePolicy @{ EventName = 'workflow_dispatch'; Version = '0.5.0'; Ref = 'main'; ApproveUnverifiedPublication = $true } -ExpectedError 'Manual ref must'
 Assert-ReleasePolicy @{ EventName = 'workflow_dispatch'; Version = '0.5.0'; Ref = 'v0.5.1'; ApproveUnverifiedPublication = $true } -ExpectedError 'Manual ref must'
 Assert-ReleasePolicy @{ EventName = 'release'; ReleaseTag = 'V0.5.0' } -ExpectedError 'Expected SemVer'
+Assert-ReleasePolicy @{ EventName = 'workflow_dispatch'; Version = '0.5.0'; Ref = ('a' * 40); VerifyPublishedRun = '35729776067' } -ExpectedVersion '0.5.0' -ExpectedVerificationRun '35729776067'
+Assert-ReleasePolicy @{ EventName = 'workflow_dispatch'; Version = '0.5.0'; Ref = ('a' * 40); VerifyPublishedRun = '35729776067'; ApproveUnverifiedPublication = $true } -ExpectedError 'publication approval disabled'
+Assert-ReleasePolicy @{ EventName = 'release'; ReleaseTag = 'v0.5.0'; VerifyPublishedRun = '35729776067' } -ExpectedError 'manual dispatch'
+foreach ($run in @('0', '001', '-1', 'bad/run')) {
+    Assert-ReleasePolicy @{ EventName = 'workflow_dispatch'; Version = '0.5.0'; Ref = ('a' * 40); VerifyPublishedRun = $run } -ExpectedError 'numeric original publication run ID'
+}
 Write-Host "PASS: $passed release-policy regression checks."

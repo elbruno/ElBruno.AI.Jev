@@ -18,6 +18,11 @@ on:
         required: true
         default: false
         type: boolean
+      verify-published-run:
+        description: 'Optional original publication run ID: verify its public package only, never push again'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -43,6 +48,7 @@ jobs:
       version: ${{ steps.metadata.outputs.version }}
       repository: ${{ steps.metadata.outputs.repository }}
       publish_allowed: ${{ steps.metadata.outputs.publish_allowed }}
+      verification_run: ${{ steps.metadata.outputs.verification_run }}
       commit: ${{ steps.commit.outputs.commit }}
     steps:
       - name: Checkout release-policy implementation
@@ -57,16 +63,20 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_REF: ${{ inputs.ref }}
           APPROVE_UNVERIFIED_PUBLICATION: ${{ inputs.approve-unverified-publication }}
+          VERIFY_PUBLISHED_RUN: ${{ inputs.verify-published-run }}
         run: |
           & .\scripts\Test-ReleasePolicy.Tests.ps1
           $metadata = & .\scripts\Get-ReleaseMetadata.ps1 -EventName $env:EVENT_NAME -ReleaseTag $env:RELEASE_TAG `
             -Version $env:INPUT_VERSION -Ref $env:INPUT_REF -Repository $env:GITHUB_REPOSITORY `
-            -ApproveUnverifiedPublication:($env:APPROVE_UNVERIFIED_PUBLICATION -ceq 'true')
+            -ApproveUnverifiedPublication:($env:APPROVE_UNVERIFIED_PUBLICATION -ceq 'true') -VerifyPublishedRun $env:VERIFY_PUBLISHED_RUN
           $publishAllowed = $metadata.PublishAllowed.ToString().ToLowerInvariant()
           "version=$($metadata.Version)" >> $env:GITHUB_OUTPUT
           "repository=$($metadata.RepositoryUrl)" >> $env:GITHUB_OUTPUT
           "publish_allowed=$publishAllowed" >> $env:GITHUB_OUTPUT
-          if ($publishAllowed -eq 'false') {
+          "verification_run=$($metadata.VerificationRun)" >> $env:GITHUB_OUTPUT
+          if ($metadata.VerificationRun) {
+            'Public verification only: use the original artifacts, with no rebuild, NuGet publication, or OIDC exchange.' >> $env:GITHUB_STEP_SUMMARY
+          } elseif ($publishAllowed -eq 'false') {
             'Validation only: no NuGet publication or OIDC exchange. An explicitly approved manual preview or tentative 0.5.0 dispatch is required to publish.' >> $env:GITHUB_STEP_SUMMARY
           } else {
             'Tentative publication explicitly approved. Live Jev compatibility remains unverified; this is not a production-readiness claim.' >> $env:GITHUB_STEP_SUMMARY
@@ -85,6 +95,7 @@ jobs:
 
   validate:
     needs: prepare
+    if: ${{ needs.prepare.outputs.verification_run == '' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     strategy:
@@ -159,7 +170,7 @@ jobs:
 
   publish:
     needs: [prepare, validate]
-    if: ${{ success() && needs.prepare.outputs.publish_allowed == 'true' }}
+    if: ${{ success() && needs.prepare.outputs.publish_allowed == 'true' && needs.prepare.outputs.verification_run == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: release
@@ -198,5 +209,66 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify public indexing and exact restored package
         run: |
-          & .\scripts\Test-Package.ps1 -PackageDirectory (Join-Path (Join-Path $PWD artifacts) packages) -Version $env:PACKAGE_VERSION -RequireSourceLink -ExpectedRepositoryUrl $env:REPOSITORY_URL -UsePublicFeed -IndexAttempts 10 -IndexDelaySeconds 30
+          & .\scripts\Test-Package.ps1 -PackageDirectory (Join-Path (Join-Path $PWD artifacts) packages) -Version $env:PACKAGE_VERSION -RequireSourceLink -ExpectedRepositoryUrl $env:REPOSITORY_URL -UsePublicFeed -IndexAttempts 20 -IndexDelaySeconds 60
           "Verified ElBruno.AI.Jev $env:PACKAGE_VERSION from public NuGet using a fresh isolated cache and offline consumer." >> $env:GITHUB_STEP_SUMMARY
+
+  verify-public:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.verification_run != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    env:
+      PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+      REPOSITORY_URL: ${{ needs.prepare.outputs.repository }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+      PUBLICATION_RUN: ${{ needs.prepare.outputs.verification_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - name: Verify original publication run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:PUBLICATION_RUN" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($run.path -cne '.github/workflows/publish.yml' -or $run.event -cne 'workflow_dispatch' -or
+              $run.head_repository.full_name -cne $env:GITHUB_REPOSITORY -or $run.status -cne 'completed') {
+            throw 'Expected a completed manual publication run in this repository.'
+          }
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages-ubuntu-latest
+          path: artifacts/packages
+          run-id: ${{ needs.prepare.outputs.verification_run }}
+          github-token: ${{ github.token }}
+      - name: Match original package to the requested source revision
+        run: |
+          $path = Join-Path (Join-Path (Join-Path $PWD artifacts) packages) "ElBruno.AI.Jev.$env:PACKAGE_VERSION.nupkg"
+          $archive = [IO.Compression.ZipFile]::OpenRead($path)
+          try {
+            $entry = $archive.GetEntry('ElBruno.AI.Jev.nuspec')
+            if ($null -eq $entry) { throw 'Missing package manifest.' }
+            $stream = $entry.Open()
+            try {
+              $manifest = [Xml.XmlDocument]::new()
+              $manifest.XmlResolver = $null
+              $manifest.Load($stream)
+            } finally { $stream.Dispose() }
+            $repository = $manifest.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='repository']")
+            if ($null -eq $repository -or $repository.GetAttribute('url') -cne $env:REPOSITORY_URL -or
+                $repository.GetAttribute('commit') -cne $env:RELEASE_COMMIT) {
+              throw 'Original artifacts do not match the requested repository and immutable source revision.'
+            }
+          } finally { $archive.Dispose() }
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.4xx'
+      - name: Verify public indexing and original package without republishing
+        run: |
+          & .\scripts\Test-Package.ps1 -PackageDirectory (Join-Path (Join-Path $PWD artifacts) packages) -Version $env:PACKAGE_VERSION -RequireSourceLink -ExpectedRepositoryUrl $env:REPOSITORY_URL -UsePublicFeed -IndexAttempts 20 -IndexDelaySeconds 60
+          "Verified public ElBruno.AI.Jev $env:PACKAGE_VERSION against original artifacts from run $env:PUBLICATION_RUN. No package was rebuilt or republished." >> $env:GITHUB_STEP_SUMMARY

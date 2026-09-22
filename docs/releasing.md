@@ -172,15 +172,18 @@ publication. It is configured to require approval from `elbruno`. All jobs have
 `contents: read`; only the publishing job additionally has `id-token: write`.
 The job rechecks the downloaded, validated Linux artifacts and exchanges OIDC
 through **`NuGet/login@v1`**, with the account name supplied by the
-**`NUGET_USER` secret**. No long-lived NuGet API key is needed.
+**`NUGET_USER` secret in the `release` environment**. An environment secret takes
+precedence over a repository secret with the same name. Its value is the NuGet
+username (`elbruno`), not an API key. No long-lived NuGet API key is needed.
 
 ### Existing trusted-publishing policy
 
-The owner has already confirmed an existing NuGet trusted-publishing policy for
-**`ElBruno.AI.Jev`**. **Reuse it; do not create a duplicate.** Its exact fields
-have not been inspected. Repository creation and the `NUGET_USER=elbruno` repository secret are configured;
-the NuGet username was verified from the reference package's public ownership.
-Before an authorized publication verify:
+The existing NuGet trusted-publishing policy was successfully used to publish
+**`ElBruno.AI.Jev` 0.5.0**. **Reuse it; do not create a duplicate.** The OIDC
+exchange and first package/symbol push succeeded. `NUGET_USER` is now configured
+in the protected `release` environment; the original publication used the same
+secret name at repository scope. Before changing the publishing configuration,
+verify:
 
 - The policy's actual owner/repository match `GITHUB_REPOSITORY`.
 - The allowed workflow filename matches **`publish.yml`**.
@@ -200,8 +203,8 @@ duplicate-version attempts. The workflow pushes the exact validated `.nupkg`;
 do **not** add `--skip-duplicate`: an unexpected duplicate must fail, not appear
 to be a successful new publication.
 
-After push, `Test-Package.ps1 -UsePublicFeed` performs up to ten exact-version
-public restores, 30 seconds apart, with a fresh isolated package/HTTP cache on
+After push, the workflow calls `Test-Package.ps1 -UsePublicFeed` for up to twenty
+exact-version public restores, 60 seconds apart, with a fresh isolated package/HTTP cache on
 every attempt. A successful restore must also build and run the offline consumer
 and match the validated assembly hash. Exhausted retries or consumer failures
 fail the workflow; a push alone is not indexing success. The publishing job has
@@ -209,7 +212,18 @@ a 25-minute overall deadline, including network restore time.
 
 If indexing verification fails after a successful push, investigate the NuGet
 status and rerun **only** the public package check against downloaded validated
-artifacts; do not blindly republish the immutable version:
+artifacts; do not blindly republish the immutable version. NuGet can accept an
+upload and show its page before its install feed has indexed the package.
+
+For a hosted recovery, manually dispatch `publish.yml` with the original
+`version` and immutable `ref`, set `verify-published-run` to the original
+publication run ID, and leave `approve-unverified-publication=false`.
+This mode skips rebuild/publish jobs, downloads the original Linux artifacts,
+checks their repository/commit against the requested source, and runs only
+public restore/consumer verification. It has no OIDC permission or NuGet login.
+Publication approval and recovery mode are mutually exclusive.
+
+Alternatively, use downloaded original artifacts locally:
 
 ```powershell
 .\scripts\Test-Package.ps1 -PackageDirectory $packages -Version $version `

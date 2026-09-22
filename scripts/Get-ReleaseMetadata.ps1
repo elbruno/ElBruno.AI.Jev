@@ -8,7 +8,8 @@ param(
     [string]$Ref,
     [Parameter(Mandatory)]
     [string]$Repository,
-    [switch]$ApproveUnverifiedPublication
+    [switch]$ApproveUnverifiedPublication,
+    [string]$VerifyPublishedRun = ''
 )
 
 Set-StrictMode -Version Latest
@@ -28,6 +29,11 @@ if ($EventName -ceq 'workflow_dispatch' -and $Ref -cne "v$Version" -and $Ref -cn
 }
 if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid repository identity.' }
 $publishAllowed = $false
+if ($VerifyPublishedRun) {
+    if ($EventName -cne 'workflow_dispatch' -or $VerifyPublishedRun -notmatch '^[1-9][0-9]{0,19}\z' -or $ApproveUnverifiedPublication) {
+        throw 'Public verification requires a numeric original publication run ID, manual dispatch, and publication approval disabled.'
+    }
+}
 if ($ApproveUnverifiedPublication) {
     $isPreview = $Version -cmatch '^[0-9]+\.[0-9]+\.[0-9]+-preview(?:\.[0-9A-Za-z-]+)*\z'
     if ($EventName -cne 'workflow_dispatch' -or (-not $isPreview -and $Version -cne '0.5.0')) {
@@ -39,4 +45,5 @@ if ($ApproveUnverifiedPublication) {
     Version = $Version
     RepositoryUrl = "https://github.com/$Repository"
     PublishAllowed = $publishAllowed
+    VerificationRun = $VerifyPublishedRun
 }
