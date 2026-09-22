@@ -179,14 +179,15 @@ finally {
 }
 
 $workRoot = Join-Path $consumerRoot '.work'
-if ((Get-Item -LiteralPath $consumerRoot).Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+if ((Get-Item -LiteralPath $consumerRoot -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
     throw 'Refusing a redirected consumer directory.'
 }
 New-Item -ItemType Directory -Path $workRoot -Force | Out-Null
-if ((Get-Item -LiteralPath $workRoot).Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+$workDirectory = Get-Item -LiteralPath $workRoot -Force
+if ($workDirectory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
     throw 'Refusing a redirected scratch directory.'
 }
-$workRoot = (Resolve-Path -LiteralPath $workRoot).ProviderPath
+$workRoot = $workDirectory.FullName
 $runDirectory = Join-Path $workRoot ([Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $runDirectory | Out-Null
 $oldEnvironment = @{}
@@ -256,7 +257,7 @@ finally {
     foreach ($name in $oldEnvironment.Keys) {
         [Environment]::SetEnvironmentVariable($name, $oldEnvironment[$name], 'Process')
     }
-    $resolvedRun = (Resolve-Path -LiteralPath $runDirectory).ProviderPath
+    $resolvedRun = (Get-Item -LiteralPath $runDirectory -Force).FullName
     if ((Split-Path $resolvedRun -Parent) -ne $workRoot -or (Split-Path $resolvedRun -Leaf) -notmatch '^[0-9a-f]{32}$') {
         throw 'Refusing cleanup outside this specific package-test run.'
     }
