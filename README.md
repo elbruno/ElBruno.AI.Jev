@@ -1,7 +1,7 @@
 # ElBruno.AI.Jev
 
-[![NuGet version](https://img.shields.io/nuget/v/ElBruno.AI.Jev?logo=nuget)](https://www.nuget.org/packages/ElBruno.AI.Jev)
-[![NuGet downloads](https://img.shields.io/nuget/dt/ElBruno.AI.Jev?logo=nuget)](https://www.nuget.org/packages/ElBruno.AI.Jev)
+[![NuGet version](https://img.shields.io/nuget/v/ElBruno.AI.Jev.svg?logo=nuget)](https://www.nuget.org/packages/ElBruno.AI.Jev)
+[![NuGet downloads](https://img.shields.io/nuget/dt/ElBruno.AI.Jev.svg?logo=nuget)](https://www.nuget.org/packages/ElBruno.AI.Jev)
 [![CI](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/ci.yml)
 [![Release pipeline](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/publish.yml)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet)](https://dotnet.microsoft.com/download/dotnet/10.0)
