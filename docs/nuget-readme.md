@@ -2,6 +2,16 @@
 
 A community .NET 10 client for the official TypeSafe AI Jev service.
 
+> **Tentative early-access release (0.5.0).** Live service compatibility remains
+> unverified, and live testing is deferred. Offline test and package validation
+> success does not prove real-service behavior. Evaluate before production use;
+> APIs may change before 1.0. NuGet classifies `0.5.0` as stable because it has
+> no prerelease suffix, but this package is still explicitly tentative.
+
+```powershell
+dotnet add package ElBruno.AI.Jev --version 0.5.0
+```
+
 ## Capabilities
 
 - Choice classification with full probability distributions and confidence.
@@ -37,4 +47,6 @@ Microsoft.Extensions.AI integrations wrap your own chat clients; a Jev credentia
 
 Official service documentation: https://docs.typesafe.ai/
 
-This preview requires real-service validation before stable release. See [the project repository](https://github.com/elbruno/ElBruno.AI.Jev) for runnable samples, configuration, tests, known limitations, and release instructions.
+The maintainer has authorized this tentative release before live verification.
+See [the project repository](https://github.com/elbruno/ElBruno.AI.Jev) for runnable
+samples, configuration, tests, known limitations, and release instructions.

@@ -3,9 +3,10 @@
 Preparing this infrastructure does **not** authorize a publication. Ordinary
 builds, CI, and package-consumer checks need no Jev credentials and make no Jev
 service calls. NuGet dependency restore requires network access. Live service
-validation remains a separate, explicitly approved prerequisite for stable
-publication. The only current exception is an explicitly approved manual
-preview publication acknowledging that live compatibility is unverified.
+validation remains necessary before claiming production readiness. The maintainer
+has explicitly authorized **tentative 0.5.0** while live checks are deferred.
+Manual preview publication is also supported; both paths must acknowledge that
+live compatibility is unverified. No other suffix-free version is authorized.
 
 ## Local package check
 
@@ -27,11 +28,11 @@ dotnet pack $library --configuration Release --output $packages
 ```
 
 `Test-Package.ps1` reads the version from `Directory.Build.props` by default.
-For an explicitly selected prerelease, pass the **same** override to pack and
+For an explicitly selected version, pass the **same** override to pack and
 the package check; do not use `--no-build` against assemblies of another version:
 
 ```powershell
-$version = '0.1.0-preview.1'
+$version = '0.5.0'
 dotnet pack $library --configuration Release --output $packages "-p:Version=$version"
 .\scripts\Test-Package.ps1 -PackageDirectory $packages -Version $version
 ```
@@ -47,6 +48,8 @@ The check:
   ignoring UTF-8 BOM and CRLF/LF differences. This preserves the dedicated
   NuGet page instead of accidentally packing the repository README's relative
   hero image. Check downloaded artifacts from their matching release checkout.
+- Requires tentative/unverified notices in the actual 0.5.0 package description,
+  release notes, and packaged README, not just in the repository.
 - Copies the standalone consumer into a uniquely named directory under
   `tests\ElBruno.AI.Jev.PackageTests\.work`. Its only SDK dependency is an
   **exact-version PackageReference**, never a ProjectReference. Do not add this
@@ -121,24 +124,32 @@ fixtures. macOS runs a build/unit-test smoke job. Live integration tests remain 
 
 `publish.yml` supports:
 
-1. A **published GitHub release** with a tag such as `v0.1.0-preview.1` or
-   `0.1.0-preview.1`; the tag resolves the exact source commit. This runs
+1. A **published GitHub release** with a tag such as `v0.5.0` or
+   `0.5.0`; the tag resolves the exact source commit. This runs
    validation only and never automatically publishes to NuGet.
 2. **Manual dispatch** with required `version` and `ref` inputs. `version` has
    no `v` prefix. `ref` must be the corresponding version tag, optionally
    prefixed `v`, or a full 40-character commit SHA. Arbitrary moving branch
-   names are not accepted. The boolean `approve-preview-publication` defaults
+   names are not accepted. The boolean `approve-unverified-publication` defaults
    to **false**, which also means validation only.
 
 **Publication is blocked by default while live compatibility is unverified.**
-Only a manual dispatch with `approve-preview-publication=true` and an exact
+Only a manual dispatch with `approve-unverified-publication=true` and either
+the explicitly authorized **`0.5.0`** or a
 `major.minor.patch-preview[.identifier...]` version can reach the publishing
-job. That input explicitly acknowledges the absence of live validation for
-this particular preview; it is not an attestation that live tests passed.
-Stable versions and other prerelease channels cannot use this exception.
-They remain blocked until actual live-contract evidence supports a separately
-reviewed policy change. Creating a GitHub release, approving repository
+job. That input acknowledges the absence of successful live validation;
+it is not an attestation that live tests passed. Other suffix-free versions
+(including `0.5.1` and `1.0.0`) and other prerelease channels remain blocked.
+`Get-ReleaseMetadata.ps1` owns this policy; `Test-ReleasePolicy.Tests.ps1`
+checks the exact exception, opt-in requirement, event/ref constraints, and
+invalid versions on every validation run. Creating a GitHub release, approving repository
 creation, or leaving the checkbox unchecked does not authorize a NuGet push.
+
+NuGet treats **`0.5.0` as a stable-channel version** because it has no prerelease
+suffix; NuGet has no separate tentative flag. The description, package README,
+release notes, and repository status therefore prominently disclose tentative
+early-access status and deferred live compatibility. A GitHub release may be
+marked prerelease independently, but that does not change NuGet's classification.
 
 Inputs are validated and passed to shell scripts through environment variables,
 not interpolated into executable shell text. The workflow resolves the checkout
@@ -156,7 +167,7 @@ still derives its overrides from the real `GITHUB_REPOSITORY` and resolves
 an actual checkout commit. Repository creation alone does not establish a
 published source revision or valid Source Link evidence.
 
-The protected **`release` environment** additionally gates an approved preview
+The protected **`release` environment** additionally gates an approved tentative
 publication. It is configured to require approval from `elbruno`. All jobs have
 `contents: read`; only the publishing job additionally has `id-token: write`.
 The job rechecks the downloaded, validated Linux artifacts and exchanges OIDC
@@ -223,10 +234,10 @@ does **not** replace a review of the initial public API. Before authorization:
   and immutable source revision matching the package manifest without downloading source.
 - Separately verify that the mapped source is publicly accessible at that commit;
   mapping validation alone does not prove public repository visibility.
-- Finish actual coverage gates. For stable publication, finish the explicitly
+- Finish actual coverage gates. Before claiming production readiness, finish
   authorized live-contract validation; offline consumer success is not
-  live-service compatibility evidence. An approved preview must disclose the
-  unverified live compatibility rather than claim those tests passed.
+  live-service compatibility evidence. Tentative 0.5.0 and approved previews
+  must disclose unverified live compatibility rather than claim those tests passed.
 
 After an approved version is published, configure
 `PackageValidationBaselineVersion` to the last appropriate published version

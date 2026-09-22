@@ -6,15 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Exact SemVer to validate, for example 0.1.0-preview.1 (no v prefix)'
+        description: 'Exact SemVer to validate, for example 0.5.0 (no v prefix)'
         required: true
         type: string
       ref:
         description: 'Existing release tag or full commit SHA to build'
         required: true
         type: string
-      approve-preview-publication:
-        description: 'Explicitly approve publishing this preview despite unverified live Jev compatibility'
+      approve-unverified-publication:
+        description: 'Approve publishing a preview or tentative 0.5.0 despite unverified live Jev compatibility'
         required: true
         default: false
         type: boolean
@@ -45,6 +45,10 @@ jobs:
       publish_allowed: ${{ steps.metadata.outputs.publish_allowed }}
       commit: ${{ steps.commit.outputs.commit }}
     steps:
+      - name: Checkout release-policy implementation
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate release version and requested ref
         id: metadata
         env:
@@ -52,34 +56,20 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_REF: ${{ inputs.ref }}
-          APPROVE_PREVIEW_PUBLICATION: ${{ inputs.approve-preview-publication }}
+          APPROVE_UNVERIFIED_PUBLICATION: ${{ inputs.approve-unverified-publication }}
         run: |
-          $version = if ($env:EVENT_NAME -eq 'release') { $env:RELEASE_TAG -creplace '^v', '' } else { $env:INPUT_VERSION }
-          if ($version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?\z') {
-            throw 'Expected SemVer without build metadata; published tags may have one lowercase v prefix.'
-          }
-          $parts = $version.Split('-', 2)
-          if ($parts.Count -eq 2) {
-            foreach ($identifier in $parts[1].Split('.')) {
-              if ($identifier -match '^0[0-9]+$') { throw 'Numeric prerelease identifiers cannot start with zero.' }
-            }
-          }
-          if ($env:EVENT_NAME -eq 'workflow_dispatch' -and $env:INPUT_REF -cne "v$version" -and $env:INPUT_REF -cne $version -and $env:INPUT_REF -notmatch '^[0-9a-fA-F]{40}\z') {
-            throw 'Manual ref must be the matching version tag (optionally prefixed v) or a full commit SHA.'
-          }
-          if ($env:GITHUB_REPOSITORY -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid repository identity.' }
-          $publishAllowed = 'false'
-          if ($env:APPROVE_PREVIEW_PUBLICATION -ceq 'true') {
-            if ($env:EVENT_NAME -cne 'workflow_dispatch' -or $version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+-preview(?:\.[0-9A-Za-z-]+)*\z') {
-              throw 'Live compatibility is unverified. Only an explicitly approved manual -preview publication is permitted; stable and other prereleases remain blocked.'
-            }
-            $publishAllowed = 'true'
-          }
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "repository=https://github.com/$env:GITHUB_REPOSITORY" >> $env:GITHUB_OUTPUT
+          & .\scripts\Test-ReleasePolicy.Tests.ps1
+          $metadata = & .\scripts\Get-ReleaseMetadata.ps1 -EventName $env:EVENT_NAME -ReleaseTag $env:RELEASE_TAG `
+            -Version $env:INPUT_VERSION -Ref $env:INPUT_REF -Repository $env:GITHUB_REPOSITORY `
+            -ApproveUnverifiedPublication:($env:APPROVE_UNVERIFIED_PUBLICATION -ceq 'true')
+          $publishAllowed = $metadata.PublishAllowed.ToString().ToLowerInvariant()
+          "version=$($metadata.Version)" >> $env:GITHUB_OUTPUT
+          "repository=$($metadata.RepositoryUrl)" >> $env:GITHUB_OUTPUT
           "publish_allowed=$publishAllowed" >> $env:GITHUB_OUTPUT
           if ($publishAllowed -eq 'false') {
-            'Validation only: no NuGet publication or OIDC exchange. Live Jev compatibility is unverified; an explicitly approved manual preview dispatch is required to publish.' >> $env:GITHUB_STEP_SUMMARY
+            'Validation only: no NuGet publication or OIDC exchange. An explicitly approved manual preview or tentative 0.5.0 dispatch is required to publish.' >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            'Tentative publication explicitly approved. Live Jev compatibility remains unverified; this is not a production-readiness claim.' >> $env:GITHUB_STEP_SUMMARY
           }
       - uses: actions/checkout@v4
         with:
@@ -124,6 +114,7 @@ jobs:
           dotnet format ElBruno.AI.Jev.slnx --verify-no-changes --no-restore
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .\scripts\Test-Coverage.Tests.ps1
+          & .\scripts\Test-ReleasePolicy.Tests.ps1
           $tests = (Resolve-Path .\tests\ElBruno.AI.Jev.Tests\ElBruno.AI.Jev.Tests.csproj).Path
           $results = Join-Path (Join-Path $PWD artifacts) coverage
           dotnet test $tests --configuration Release --no-build --no-restore --settings coverage.runsettings --collect 'XPlat Code Coverage' --logger trx --results-directory $results @properties
@@ -147,7 +138,7 @@ jobs:
           $project = (Resolve-Path .\src\ElBruno.AI.Jev\ElBruno.AI.Jev.csproj).Path
           $packages = Join-Path (Join-Path $PWD artifacts) packages
           $properties = @("-p:Version=$env:PACKAGE_VERSION", "-p:RepositoryUrl=$env:REPOSITORY_URL", "-p:RepositoryCommit=$env:RELEASE_COMMIT",
-            "-p:PackageProjectUrl=$env:REPOSITORY_URL", "-p:PackageReleaseNotes=Community SDK $env:PACKAGE_VERSION. See $env:REPOSITORY_URL/releases.")
+            "-p:PackageProjectUrl=$env:REPOSITORY_URL", "-p:PackageReleaseNotes=Tentative early-access SDK $env:PACKAGE_VERSION. Live Jev compatibility is unverified. Evaluate before production use. See $env:REPOSITORY_URL/releases.")
           dotnet pack $project --configuration Release --no-restore --output $packages @properties
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .\scripts\Test-Package.ps1 -PackageDirectory $packages -Version $env:PACKAGE_VERSION -RequireSourceLink -ExpectedRepositoryUrl $env:REPOSITORY_URL

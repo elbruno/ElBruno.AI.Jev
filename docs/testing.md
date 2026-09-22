@@ -12,7 +12,7 @@ Normal tests use instrumented handlers and deterministic chat clients, not Jev o
 
 Coverage excludes generated JSON metadata, not handwritten transport/mapping code. CI checks line/branch coverage and builds and runs every sample with explicit offline fixtures. Package checks restore the actual local `.nupkg` in an isolated consumer without project references. See the [release guide](releasing.md) for the package check script.
 
-## Live suite: deliberate later handoff
+## Live suite: deliberately deferred for tentative 0.5.0
 
 Live tests are skipped unless `JEV_RUN_LIVE=1`. Once enabled, a missing key is a failure, not a skip or empty pass.
 
@@ -34,4 +34,9 @@ Assertions inspect schema, correlation, ranges, types, and reported metadata rat
 
 ## Current boundary
 
-Live service compatibility is unverified until this opt-in suite is deliberately run with an official key. Full generative-chat demos additionally require a separately configured chat provider. No amount of fixture testing proves account access, pricing, model availability, or the provider's undocumented behavior.
+Live service compatibility remains unverified until this opt-in suite succeeds
+with an official key. The maintainer has authorized tentative 0.5.0 without
+waiting for those checks; no new service calls are part of its release pipeline.
+Full generative-chat demos additionally require a separately configured chat
+provider. No amount of fixture testing proves account access, pricing, model
+availability, or the provider's undocumented behavior.

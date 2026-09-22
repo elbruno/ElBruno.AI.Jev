@@ -10,6 +10,7 @@ namespace ElBruno.AI.Jev;
 /// <remarks>Do not dispose while requests are running. Caller-supplied HTTP clients are borrowed by default.</remarks>
 public sealed class JevClient : IJevDecisionClient, IDisposable
 {
+    private static readonly ProductInfoHeaderValue UserAgent = new("ElBruno.AI.Jev", typeof(JevClient).Assembly.GetName().Version!.ToString(3));
     private readonly JevClientOptions _options;
     private readonly HttpClient? _httpClient;
     private readonly Func<HttpClient>? _httpClientFactory;
@@ -171,7 +172,7 @@ public sealed class JevClient : IJevDecisionClient, IDisposable
         using var request = new HttpRequestMessage(method, new Uri(_options.Endpoint, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Headers.UserAgent.ParseAdd("ElBruno.AI.Jev/0.1");
+        request.Headers.UserAgent.Add(UserAgent);
         if (body is not null)
         {
             request.Content = new ByteArrayContent(body);

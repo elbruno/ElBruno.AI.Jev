@@ -49,6 +49,7 @@ jobs:
       - name: Offline unit tests and coverage
         run: |
           & .\scripts\Test-Coverage.Tests.ps1
+          & .\scripts\Test-ReleasePolicy.Tests.ps1
           $project = (Resolve-Path .\tests\ElBruno.AI.Jev.Tests\ElBruno.AI.Jev.Tests.csproj).Path
           $results = Join-Path (Join-Path $PWD artifacts) coverage
           dotnet test $project --configuration Release --no-build --no-restore --settings coverage.runsettings --collect 'XPlat Code Coverage' --logger trx --results-directory $results

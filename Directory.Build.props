@@ -9,13 +9,13 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.5.0</Version>
     <Authors>Bruno Capuano (ElBruno)</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/elbruno/ElBruno.AI.Jev</RepositoryUrl>
     <PackageProjectUrl>https://github.com/elbruno/ElBruno.AI.Jev</PackageProjectUrl>
-    <PackageReleaseNotes>Preview community SDK. Live Jev compatibility remains unverified. See https://github.com/elbruno/ElBruno.AI.Jev/blob/main/CHANGELOG.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>Tentative early-access release. Live Jev compatibility remains unverified; evaluate before production use. See https://github.com/elbruno/ElBruno.AI.Jev/blob/main/CHANGELOG.md.</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IsPackable>false</IsPackable>
   </PropertyGroup>

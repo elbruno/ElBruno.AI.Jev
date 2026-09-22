@@ -2,8 +2,8 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>ElBruno.AI.Jev</PackageId>
-    <Description>A community .NET 10 client for official TypeSafe AI Jev typed decisions: Choice, Score, Noul, model discovery, and Microsoft.Extensions.AI tools, routing and assessments.</Description>
-    <PackageTags>jev;typesafe;ai;dotnet;classification;decision;microsoft-extensions-ai</PackageTags>
+    <Description>Tentative early-access .NET 10 client for official TypeSafe AI Jev typed decisions: Choice, Score, Noul, model discovery, and Microsoft.Extensions.AI tools, routing and assessments. Live service compatibility is unverified; evaluate before production use.</Description>
+    <PackageTags>jev;typesafe;ai;dotnet;classification;decision;microsoft-extensions-ai;tentative;early-access</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>nuget-icon.png</PackageIcon>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

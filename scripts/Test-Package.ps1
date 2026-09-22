@@ -163,6 +163,13 @@ try {
     if ($packagedReadme -cne $sourceReadme) {
         throw 'Packaged README.md must match docs/nuget-readme.md, not the root README. Use the matching release checkout for downloaded artifacts.'
     }
+    if ($Version -ceq '0.5.0') {
+        foreach ($text in @((Get-Metadata $manifest 'description').InnerText, (Get-Metadata $manifest 'releaseNotes').InnerText, $packagedReadme)) {
+            if ($text -notmatch '\btentative\b' -or $text -notmatch '\bunverified\b') {
+                throw 'Tentative 0.5.0 must disclose tentative status and unverified live compatibility in its description, release notes, and README.'
+            }
+        }
+    }
     if ($iconBytes.Length -ge 1000000 -or [BitConverter]::ToString($iconBytes, 0, 8) -ne '89-50-4E-47-0D-0A-1A-0A') {
         throw 'Package icon must be a PNG smaller than 1 MB.'
     }

@@ -1,12 +1,23 @@
 # ElBruno.AI.Jev
 
+[![NuGet version](https://img.shields.io/nuget/v/ElBruno.AI.Jev?logo=nuget)](https://www.nuget.org/packages/ElBruno.AI.Jev)
+[![NuGet downloads](https://img.shields.io/nuget/dt/ElBruno.AI.Jev?logo=nuget)](https://www.nuget.org/packages/ElBruno.AI.Jev)
+[![CI](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/ci.yml)
+[![Release pipeline](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/elbruno/ElBruno.AI.Jev/actions/workflows/publish.yml)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![License: MIT](https://img.shields.io/github/license/elbruno/ElBruno.AI.Jev)](LICENSE)
+[![Status: tentative](https://img.shields.io/badge/status-tentative-orange)](CHANGELOG.md)
+[![Live API: unverified](https://img.shields.io/badge/live_API-unverified-orange)](docs/testing.md)
+
 ![ElBruno.AI.Jev: typed decisions for Jev AI on .NET 10](images/repo-hero.png)
 
 A community-maintained **.NET 10** client for the **official TypeSafe AI Jev API**. Evaluate **Choice**, **Score**, and **Noul** questions, preserve uncertainty, discover models, and compose decisions with **Microsoft.Extensions.AI**.
 
 > This is not an official TypeSafe AI SDK. The provider is `https://api.typesafe.ai`, documented at [docs.typesafe.ai](https://docs.typesafe.ai/). The independent `jevtypesafeai.com` proxy has different credentials and endpoints and is not supported.
 
-**Status:** offline-ready preview implementation. Real-service compatibility must still be verified with an official TypeSafe key before a release is published. No package publication is implied by this repository.
+> **Tentative 0.5.0 release:** intended for early evaluation, not a claim of production readiness. Offline tests, samples, and package-consumer checks pass, but **live Jev compatibility remains unverified** and live testing is deferred. Validate the service and your application before production use; APIs may change before 1.0.
+>
+> The exact version `0.5.0` has no prerelease suffix, so NuGet lists it in its stable version channel. **That classification does not change its tentative status.**
 
 ## Why Jev?
 
@@ -22,13 +33,13 @@ Evaluate several independent questions against the same text or structured JSON 
 
 Use the **.NET 10 SDK**. The repository pins the 10.0.4xx feature band in `global.json`.
 
-After a package is published:
+Install the tentative version:
 
 ```powershell
-dotnet add package ElBruno.AI.Jev --prerelease
+dotnet add package ElBruno.AI.Jev --version 0.5.0
 ```
 
-Until then, build and consume the local package using the [release guide](docs/releasing.md).
+To build and consume the local package instead, follow the [release guide](docs/releasing.md).
 
 ## First decision
 

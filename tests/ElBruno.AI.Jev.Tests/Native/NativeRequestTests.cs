@@ -21,7 +21,7 @@ public sealed class NativeRequestTests
         Assert.Equal($"Bearer {NativeFixtures.Credential}", sent.Authorization);
         Assert.Equal("application/json", sent.Accept);
         Assert.Equal("application/json; charset=utf-8", sent.ContentType);
-        Assert.StartsWith("ElBruno.AI.Jev/", sent.UserAgent);
+        Assert.Equal($"ElBruno.AI.Jev/{typeof(JevClient).Assembly.GetName().Version!.ToString(3)}", sent.UserAgent);
         Assert.Null(http.DefaultRequestHeaders.Authorization);
         Assert.Equal("unchanged", Assert.Single(http.DefaultRequestHeaders.GetValues("x-caller-header")));
         NativeFixtures.AssertJson("""
