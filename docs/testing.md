@@ -10,7 +10,7 @@ dotnet run --project samples\03-ParallelDecisions -c Release --no-build -- --off
 
 Normal tests use instrumented handlers and deterministic chat clients, not Jev or another cloud model. Fixtures are authored from documented contracts; they are **not recorded evidence of server compatibility**.
 
-Coverage excludes generated JSON metadata, not handwritten transport/mapping code. CI checks line/branch coverage and builds every sample. Package checks restore the actual local `.nupkg` in an isolated consumer without project references. See the release guide for the package check script.
+Coverage excludes generated JSON metadata, not handwritten transport/mapping code. CI checks line/branch coverage and builds and runs every sample with explicit offline fixtures. Package checks restore the actual local `.nupkg` in an isolated consumer without project references. See the [release guide](releasing.md) for the package check script.
 
 ## Live suite: deliberate later handoff
 

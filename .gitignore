@@ -2,6 +2,7 @@
 **/obj/
 **/TestResults/
 artifacts/
+tests/ElBruno.AI.Jev.PackageTests/.work/
 .vs/
 .idea/
 *.user

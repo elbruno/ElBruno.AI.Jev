@@ -15,6 +15,7 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/elbruno/ElBruno.AI.Jev</RepositoryUrl>
     <PackageProjectUrl>https://github.com/elbruno/ElBruno.AI.Jev</PackageProjectUrl>
+    <PackageReleaseNotes>Preview community SDK. Live Jev compatibility remains unverified. See https://github.com/elbruno/ElBruno.AI.Jev/blob/main/CHANGELOG.md.</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IsPackable>false</IsPackable>
   </PropertyGroup>

@@ -1,0 +1,211 @@
+name: Validate or publish NuGet
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact SemVer to validate, for example 0.1.0-preview.1 (no v prefix)'
+        required: true
+        type: string
+      ref:
+        description: 'Existing release tag or full commit SHA to build'
+        required: true
+        type: string
+      approve-preview-publication:
+        description: 'Explicitly approve publishing this preview despite unverified live Jev compatibility'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-ElBruno.AI.Jev
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  JEV_RUN_LIVE: '0'
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      repository: ${{ steps.metadata.outputs.repository }}
+      publish_allowed: ${{ steps.metadata.outputs.publish_allowed }}
+      commit: ${{ steps.commit.outputs.commit }}
+    steps:
+      - name: Validate release version and requested ref
+        id: metadata
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REF: ${{ inputs.ref }}
+          APPROVE_PREVIEW_PUBLICATION: ${{ inputs.approve-preview-publication }}
+        run: |
+          $version = if ($env:EVENT_NAME -eq 'release') { $env:RELEASE_TAG -creplace '^v', '' } else { $env:INPUT_VERSION }
+          if ($version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?\z') {
+            throw 'Expected SemVer without build metadata; published tags may have one lowercase v prefix.'
+          }
+          $parts = $version.Split('-', 2)
+          if ($parts.Count -eq 2) {
+            foreach ($identifier in $parts[1].Split('.')) {
+              if ($identifier -match '^0[0-9]+$') { throw 'Numeric prerelease identifiers cannot start with zero.' }
+            }
+          }
+          if ($env:EVENT_NAME -eq 'workflow_dispatch' -and $env:INPUT_REF -cne "v$version" -and $env:INPUT_REF -cne $version -and $env:INPUT_REF -notmatch '^[0-9a-fA-F]{40}\z') {
+            throw 'Manual ref must be the matching version tag (optionally prefixed v) or a full commit SHA.'
+          }
+          if ($env:GITHUB_REPOSITORY -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid repository identity.' }
+          $publishAllowed = 'false'
+          if ($env:APPROVE_PREVIEW_PUBLICATION -ceq 'true') {
+            if ($env:EVENT_NAME -cne 'workflow_dispatch' -or $version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+-preview(?:\.[0-9A-Za-z-]+)*\z') {
+              throw 'Live compatibility is unverified. Only an explicitly approved manual -preview publication is permitted; stable and other prereleases remain blocked.'
+            }
+            $publishAllowed = 'true'
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "repository=https://github.com/$env:GITHUB_REPOSITORY" >> $env:GITHUB_OUTPUT
+          "publish_allowed=$publishAllowed" >> $env:GITHUB_OUTPUT
+          if ($publishAllowed -eq 'false') {
+            'Validation only: no NuGet publication or OIDC exchange. Live Jev compatibility is unverified; an explicitly approved manual preview dispatch is required to publish.' >> $env:GITHUB_STEP_SUMMARY
+          }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve immutable release commit
+        id: commit
+        run: |
+          $commit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-fA-F]{40}$') { throw 'Could not resolve a release commit.' }
+          "commit=$commit" >> $env:GITHUB_OUTPUT
+
+  validate:
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+      REPOSITORY_URL: ${{ needs.prepare.outputs.repository }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.4xx'
+      - name: Restore, build, formatting, offline tests, and coverage
+        run: |
+          $properties = @("-p:Version=$env:PACKAGE_VERSION", "-p:RepositoryUrl=$env:REPOSITORY_URL", "-p:RepositoryCommit=$env:RELEASE_COMMIT")
+          dotnet restore ElBruno.AI.Jev.slnx @properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build ElBruno.AI.Jev.slnx --configuration Release --no-restore @properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet format ElBruno.AI.Jev.slnx --verify-no-changes --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\scripts\Test-Coverage.Tests.ps1
+          $tests = (Resolve-Path .\tests\ElBruno.AI.Jev.Tests\ElBruno.AI.Jev.Tests.csproj).Path
+          $results = Join-Path (Join-Path $PWD artifacts) coverage
+          dotnet test $tests --configuration Release --no-build --no-restore --settings coverage.runsettings --collect 'XPlat Code Coverage' --logger trx --results-directory $results @properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\scripts\Test-Coverage.ps1 -ReportDirectory $results
+          $integration = (Resolve-Path .\tests\ElBruno.AI.Jev.IntegrationTests\ElBruno.AI.Jev.IntegrationTests.csproj).Path
+          dotnet test $integration --configuration Release --no-build --no-restore --logger trx --results-directory (Join-Path (Join-Path $PWD artifacts) integration) @properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile and run every sample without calling services
+        run: |
+          $projects = @(Get-ChildItem samples -Filter *.csproj -Recurse -File)
+          if ($projects.Count -eq 0) { throw 'No sample projects found.' }
+          foreach ($project in $projects) {
+            dotnet build $project.FullName --configuration Release "-p:Version=$env:PACKAGE_VERSION"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            dotnet run --project $project.FullName --configuration Release --no-build --no-restore "-p:Version=$env:PACKAGE_VERSION" -- --offline
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Pack exact release and verify Source Link and consumer
+        run: |
+          $project = (Resolve-Path .\src\ElBruno.AI.Jev\ElBruno.AI.Jev.csproj).Path
+          $packages = Join-Path (Join-Path $PWD artifacts) packages
+          $properties = @("-p:Version=$env:PACKAGE_VERSION", "-p:RepositoryUrl=$env:REPOSITORY_URL", "-p:RepositoryCommit=$env:RELEASE_COMMIT",
+            "-p:PackageProjectUrl=$env:REPOSITORY_URL", "-p:PackageReleaseNotes=Community SDK $env:PACKAGE_VERSION. See $env:REPOSITORY_URL/releases.")
+          dotnet pack $project --configuration Release --no-restore --output $packages @properties
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\scripts\Test-Package.ps1 -PackageDirectory $packages -Version $env:PACKAGE_VERSION -RequireSourceLink -ExpectedRepositoryUrl $env:REPOSITORY_URL
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-evidence-${{ matrix.os }}
+          path: |
+            artifacts/coverage
+            artifacts/integration
+          if-no-files-found: warn
+      - name: Preserve exact validated package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages-${{ matrix.os }}
+          path: artifacts/packages
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, validate]
+    if: ${{ success() && needs.prepare.outputs.publish_allowed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PACKAGE_VERSION: ${{ needs.prepare.outputs.version }}
+      REPOSITORY_URL: ${{ needs.prepare.outputs.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.4xx'
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages-ubuntu-latest
+          path: artifacts/packages
+      - name: Recheck downloaded package artifacts
+        run: |
+          & .\scripts\Test-Package.ps1 -PackageDirectory (Join-Path (Join-Path $PWD artifacts) packages) -Version $env:PACKAGE_VERSION -RequireSourceLink -ExpectedRepositoryUrl $env:REPOSITORY_URL
+      - name: Exchange OIDC using the existing trusted-publishing policy
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+      - name: Push validated package and its adjacent symbol package
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          $package = Join-Path (Join-Path (Join-Path $PWD artifacts) packages) "ElBruno.AI.Jev.$env:PACKAGE_VERSION.nupkg"
+          dotnet nuget push $package --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_API_KEY --timeout 300
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify public indexing and exact restored package
+        run: |
+          & .\scripts\Test-Package.ps1 -PackageDirectory (Join-Path (Join-Path $PWD artifacts) packages) -Version $env:PACKAGE_VERSION -RequireSourceLink -ExpectedRepositoryUrl $env:REPOSITORY_URL -UsePublicFeed -IndexAttempts 10 -IndexDelaySeconds 30
+          "Verified ElBruno.AI.Jev $env:PACKAGE_VERSION from public NuGet using a fresh isolated cache and offline consumer." >> $env:GITHUB_STEP_SUMMARY

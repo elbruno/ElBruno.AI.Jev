@@ -17,6 +17,16 @@ Never put the key in chat, source, command arguments, or test recordings. User-s
 
 The sample host loads user-secrets explicitly, then environment variables and command-line configuration. `--offline` is a separate explicit switch installing a synthetic HTTP handler; it never falls back to live calls or silently handles missing live credentials.
 
+### HTTP 401 after saving a key
+
+Successful secret setup confirms local storage, not service authentication. If
+the official API returns `401 Unauthorized`, verify that the key is active and
+comes from the [official TypeSafe dashboard](https://console.typesafe.ai/keys),
+not the independent `jevtypesafeai.com` proxy. Rerun the masked setup script to
+replace the development key. An existing `Jev__ApiKey` environment variable takes
+precedence over user-secrets, so check for an unintended override without
+printing its value. Do not retry repeatedly or send the key to another host.
+
 ## Dependency injection
 
 ```csharp
