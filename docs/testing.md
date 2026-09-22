@@ -19,7 +19,7 @@ Live tests are skipped unless `JEV_RUN_LIVE=1`. Once enabled, a missing key is a
 Configure the shared development store locally:
 
 ```powershell
-dotnet user-secrets set "Jev:ApiKey" "<your-official-TypeSafe-key>" --project tests\ElBruno.AI.Jev.IntegrationTests
+.\scripts\Set-JevUserSecrets.ps1
 dotnet user-secrets set "Jev:DefaultModel" "jev-1.13.0" --project tests\ElBruno.AI.Jev.IntegrationTests
 $env:JEV_RUN_LIVE = "1"
 dotnet test tests\ElBruno.AI.Jev.IntegrationTests -c Release

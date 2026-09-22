@@ -7,11 +7,13 @@ The SDK targets **official TypeSafe AI**, defaulting to `https://api.typesafe.ai
 All samples and the live integration-test project share `UserSecretsId` **ElBruno.AI.Jev.Development**:
 
 ```powershell
-dotnet user-secrets set "Jev:ApiKey" "<your-official-TypeSafe-key>" --project samples\01-HelloChoice
+.\scripts\Set-JevUserSecrets.ps1
 dotnet user-secrets set "Jev:DefaultModel" "jev-1.13.0" --project samples\01-HelloChoice
 ```
 
-Replace the placeholder locally; never put the key in chat, source, README examples, or test recordings. User-secrets are outside the repository, but **are not encrypted** and are only for development. The library itself never loads user-secrets or environment variables.
+The setup script prompts for a masked key and sends JSON to `dotnet user-secrets set --id ElBruno.AI.Jev.Development` through standard input. It sets only `Jev:ApiKey`, preserving the existing model and other settings. Run it once for all ten samples and live integration tests; `-WhatIf` previews the target without prompting or writing anything.
+
+Never put the key in chat, source, command arguments, or test recordings. User-secrets are outside the repository, but **are not encrypted** and are only for development. A plaintext representation is necessarily created briefly in process memory to pass it to Secret Manager. The library itself never loads user-secrets or environment variables.
 
 The sample host loads user-secrets explicitly, then environment variables and command-line configuration. `--offline` is a separate explicit switch installing a synthetic HTTP handler; it never falls back to live calls or silently handles missing live credentials.
 

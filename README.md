@@ -73,11 +73,11 @@ dotnet run --project samples\03-ParallelDecisions -- --offline
 To configure actual calls later:
 
 ```powershell
-dotnet user-secrets set "Jev:ApiKey" "<your-official-TypeSafe-key>" --project samples\01-HelloChoice
+.\scripts\Set-JevUserSecrets.ps1
 dotnet run --project samples\01-HelloChoice
 ```
 
-Samples and integration tests share a documented development `UserSecretsId`, so configuring one sample is sufficient. **Do not paste the real key into chat or commit it.** User-secrets are outside the repository but are not an encrypted production vault. See [configuration](docs/configuration.md).
+The script prompts for a masked key and passes it through standard input, not command arguments. Samples and integration tests share one development `UserSecretsId`, so running it once configures all of them. **Do not paste the real key into chat or commit it.** User-secrets are outside the repository but are not an encrypted production vault. See [configuration](docs/configuration.md).
 
 ## Microsoft.Extensions.AI
 
