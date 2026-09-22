@@ -1,0 +1,14 @@
+<Project>
+  <Import Project="..\Directory.Build.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>ElBruno.AI.Jev.Development</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\src\ElBruno.AI.Jev\ElBruno.AI.Jev.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shared\SampleConfiguration.cs" Link="SampleConfiguration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shared\OfflineJevHandler.cs" Link="OfflineJevHandler.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shared\DemoChatClient.cs" Link="DemoChatClient.cs" />
+  </ItemGroup>
+</Project>
